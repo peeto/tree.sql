@@ -38,8 +38,31 @@ BEGIN
 END ;;
 DELIMITER ;
 
+DROP FUNCTION IF EXISTS `fn_get_tree_depth`;
+DELIMITER ;;
+CREATE FUNCTION `fn_get_tree_depth`(inid INT) RETURNS INT
+BEGIN
+  DECLARE childparentid INT;
+  DECLARE depth INT;
+    
+  SET childparentid = inid;
+  SET depth = 0;
+    
+  WHILE childparentid IS NOT NULL DO
+    SELECT parentid INTO childparentid FROM tree WHERE id=childparentid;
+    IF childparentid IS NOT NULL THEN
+        SET depth = depth + 1;
+    END IF;
+  END WHILE;
+    
+  RETURN depth;
+END ;;
+DELIMITER ;
+
 DROP TABLE IF EXISTS `v_tree_path`;
 DROP VIEW IF EXISTS `v_tree_path`;
 CREATE VIEW `v_tree_path` AS 
-  SELECT id,`name`,parentid,fn_get_tree_path(id) AS path
+  SELECT id,`name`,parentid,
+  fn_get_tree_path(id) AS path,
+  fn_get_tree_depth(id) AS depth
   FROM tree ORDER BY fn_get_tree_path(id);
