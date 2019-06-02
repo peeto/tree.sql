@@ -216,3 +216,11 @@ UNLOCK TABLES;
 -- test update query
 UPDATE tree SET name='newsuper2' WHERE id=2;
 CALL sp_repair_tree_cache(2); -- fk updates don't fire triggers so deal with it manually
+
+DELETE FROM tree WHERE id=1;
+CALL sp_repair_tree_cache(1); -- fk updates don't fire triggers so deal with it manually
+
+UPDATE tree SET name='two' WHERE id=6;
+CALL sp_repair_tree_cache(6); -- fk updates don't fire triggers so deal with it manually
+
+SELECT * FROM v_tree_cachepath;
