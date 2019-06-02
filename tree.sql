@@ -31,7 +31,7 @@ ADD CONSTRAINT fk_tree_cache_id
   FOREIGN KEY (id)
   REFERENCES tree (id)
   ON DELETE CASCADE
-  ON UPDATE NO ACTION;
+  ON UPDATE CASCADE;
 
 DROP FUNCTION IF EXISTS `fn_get_tree_path`;
 DELIMITER ;;
@@ -148,7 +148,7 @@ BEGIN
   DECLARE finished INTEGER DEFAULT 0;
   
   DECLARE tree_cursor CURSOR FOR 
-    SELECT id from child_list;
+    SELECT id FROM child_list;
  
   DECLARE CONTINUE HANDLER 
     FOR NOT FOUND SET finished = 1;
@@ -178,6 +178,36 @@ BEGIN
   CALL sp_repair_tree_cursor();
   DROP TABLE child_list;
   
+END$$
+DELIMITER ;
+
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_rebuild_tree_cache$$
+CREATE PROCEDURE sp_rebuild_tree_cache()
+BEGIN
+  DECLARE newparentid INT;
+  DECLARE finished INTEGER DEFAULT 0;
+  
+  DECLARE tree_cursor CURSOR FOR 
+    SELECT id FROM tree 
+      WHERE parentid IS NULL
+      ORDER BY id;
+ 
+  DECLARE CONTINUE HANDLER 
+    FOR NOT FOUND SET finished = 1;
+  
+  OPEN tree_cursor;
+  
+  get_children: LOOP
+    FETCH tree_cursor INTO newparentid;
+    IF finished = 1 THEN 
+      LEAVE get_children;
+    END IF;
+    CALL sp_repair_tree_cache(newparentid);
+  END LOOP get_children;
+
+  CLOSE tree_cursor;
+    
 END$$
 DELIMITER ;
 
@@ -213,14 +243,21 @@ INSERT INTO tree VALUES (1,'super1',NULL,false),(2,'super2',NULL,false),(3,'supe
   (7,'one',4,false),(8,'one',5,false),(9,'one',6,false);
 UNLOCK TABLES;
 
+-- destroy and rebuild cache just for fun
+TRUNCATE tree_cache;
+CALL sp_rebuild_tree_cache();
+
 -- test update query
 UPDATE tree SET name='newsuper2' WHERE id=2;
 CALL sp_repair_tree_cache(2); -- fk updates don't fire triggers so deal with it manually
 
+-- test delete query
 DELETE FROM tree WHERE id=1;
 CALL sp_repair_tree_cache(1); -- fk updates don't fire triggers so deal with it manually
 
+-- test update query
 UPDATE tree SET name='two' WHERE id=6;
 CALL sp_repair_tree_cache(6); -- fk updates don't fire triggers so deal with it manually
 
+-- show cache
 SELECT * FROM v_tree_cachepath;
