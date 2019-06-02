@@ -237,27 +237,53 @@ CREATE VIEW `v_tree_cachepath` AS
 SET FOREIGN_KEY_CHECKS=1;
 
 -- insert test data
-LOCK TABLES tree WRITE;
-INSERT INTO tree VALUES (1,'super1',NULL,false),(2,'super2',NULL,false),(3,'super3',NULL,false),
-  (4,'one',1,false),(5,'one',2,false),(6,'one',3,false),
-  (7,'one',4,false),(8,'one',5,false),(9,'one',6,false);
-UNLOCK TABLES;
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_generate_test_data$$
+CREATE PROCEDURE sp_generate_test_data(maxrecords INT, depth INT, parentid INT)
+BEGIN
+	DECLARE counter INT;
+	DECLARE lastparent INT;
+    DECLARE newname VARCHAR(255);
+    
+    SET counter = 0;
+    SET newname = '';
+    
+    SET max_sp_recursion_depth=255;
+    
+	WHILE counter < maxrecords DO
+      IF parentid IS NULL THEN
+        SET newname = concat('super', counter);
+      ELSE
+        SET newname = concat('child', counter);
+      END IF;
+      INSERT INTO tree (name, parentid, forceupdate) VALUES (newname, parentid, false);
+      SET lastparent = last_insert_id();
+      IF depth - 1 > 0 THEN
+		CALL sp_generate_test_data(maxrecords, depth - 1, lastparent);
+      END IF;  
+ 	  SET counter = counter + 1;
+    END WHILE;
+    
+END$$
+DELIMITER ;
+
+CALL sp_generate_test_data(5, 4, NULL);
 
 -- destroy and rebuild cache just for fun
-TRUNCATE tree_cache;
-CALL sp_rebuild_tree_cache();
+-- TRUNCATE tree_cache;
+-- CALL sp_rebuild_tree_cache();
 
 -- test update query
 UPDATE tree SET name='newsuper2' WHERE id=2;
 CALL sp_repair_tree_cache(2); -- fk updates don't fire triggers so deal with it manually
 
--- test delete query
-DELETE FROM tree WHERE id=1;
-CALL sp_repair_tree_cache(1); -- fk updates don't fire triggers so deal with it manually
-
 -- test update query
 UPDATE tree SET name='two' WHERE id=6;
 CALL sp_repair_tree_cache(6); -- fk updates don't fire triggers so deal with it manually
 
+-- test delete query
+-- DELETE FROM tree WHERE id=1;
+-- CALL sp_repair_tree_cache(1); -- fk updates don't fire triggers so deal with it manually
+
 -- show cache
-SELECT * FROM v_tree_cachepath;
+SELECT * FROM v_tree_cachepath LIMIT 100000;
