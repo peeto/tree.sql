@@ -122,21 +122,37 @@ BEGIN
 END$$
 DELIMITER ;  
 
--- fk updates don't fire triggers so deal with it manually
+-- get all descendant list into temp table for cursor
 DELIMITER $$
-DROP PROCEDURE IF EXISTS sp_repair_tree_cache$$
-CREATE PROCEDURE sp_repair_tree_cache(IN oldid INT)
+DROP PROCEDURE IF EXISTS sp_get_all_children$$
+CREATE PROCEDURE sp_get_all_children(IN oldid INT)
+BEGIN
+  DROP TABLE IF EXISTS child_list;
+  CREATE TEMPORARY TABLE child_list (id INT, parentid INT);
+  
+  INSERT INTO child_list (SELECT id, parentid 
+    FROM (SELECT id, parentid FROM tree ORDER BY id, parentid) AS tree_sorted,
+      (SELECT @seekid := oldid) initialisation
+    WHERE find_in_set(parentid, @seekid)
+    AND length(@seekid := concat(@seekid, ',', id)));
+  
+END$$
+DELIMITER ;
+
+-- runs cursor for sp_repair_tree_cache
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_repair_tree_cursor$$
+CREATE PROCEDURE sp_repair_tree_cursor()
 BEGIN
   DECLARE newparentid INT;
   DECLARE finished INTEGER DEFAULT 0;
   
   DECLARE tree_cursor CURSOR FOR 
-    SELECT id FROM tree WHERE parentid=oldid;
+    SELECT id from child_list;
  
   DECLARE CONTINUE HANDLER 
     FOR NOT FOUND SET finished = 1;
   
-  SET @@SESSION.max_sp_recursion_depth = 255;
   OPEN tree_cursor;
   
   get_children: LOOP
@@ -145,10 +161,22 @@ BEGIN
       LEAVE get_children;
     END IF;
     UPDATE tree SET forceupdate = NOT forceupdate WHERE id=newparentid; -- force trigger to fire
-    CALL sp_repair_tree_cache(newparentid);
   END LOOP get_children;
 
   CLOSE tree_cursor;
+  
+END$$
+DELIMITER ;
+
+-- fk updates don't fire triggers so deal with it manually
+DELIMITER $$
+DROP PROCEDURE IF EXISTS sp_repair_tree_cache$$
+CREATE PROCEDURE sp_repair_tree_cache(IN oldid INT)
+BEGIN
+
+  CALL sp_get_all_children(oldid);
+  CALL sp_repair_tree_cursor();
+  DROP TABLE child_list;
   
 END$$
 DELIMITER ;
