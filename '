@@ -53,7 +53,7 @@ BEGIN
   WHILE childparentid IS NOT NULL DO
     SELECT parentid INTO childparentid FROM tree WHERE id=childparentid;
     IF childparentid IS NOT NULL THEN
-      SET depth = depth + 1;
+        SET depth = depth + 1;
     END IF;
   END WHILE;
     
@@ -100,11 +100,10 @@ DELIMITER ;
 DROP TABLE IF EXISTS `v_tree_calcpath`;
 DROP VIEW IF EXISTS `v_tree_calcpath`;
 CREATE VIEW `v_tree_calcpath` AS 
-  SELECT
-    id,`name`,parentid,
-    fn_get_tree_path(id) AS path,
-    fn_get_tree_depth(id) AS depth,
-    fn_get_tree_superparent(id) AS superparent
+  SELECT id,`name`,parentid,
+  fn_get_tree_path(id) AS path,
+  fn_get_tree_depth(id) AS depth,
+  fn_get_tree_superparent(id) AS superparent
   FROM tree ORDER BY fn_get_tree_path(id);
 
 -- function to attempt to find a common ancestor  
@@ -189,12 +188,11 @@ DELIMITER ;
 DROP TABLE IF EXISTS `v_tree_commonparent`;
 DROP VIEW IF EXISTS `v_tree_commonparent`;
 CREATE VIEW `v_tree_commonparent` AS 
-  SELECT
-    a.id AS aid, b.id AS bid,
-    a.path AS apath, b.path AS bpath,
-    a.depth AS adepth, b.depth AS bdepth,
-    fn_get_tree_commonparent(a.id, b.id) AS commonparentid,
-    fn_get_tree_commondepth(a.id, b.id) AS commondepth
+  SELECT a.id AS aid, b.id AS bid,
+  a.path AS apath, b.path AS bpath,
+  a.depth AS adepth, b.depth AS bdepth,
+  fn_get_tree_commonparent(a.id, b.id) AS commonparentid,
+  fn_get_tree_commondepth(a.id, b.id) AS commondepth
   FROM v_tree_calcpath AS a
   CROSS JOIN v_tree_calcpath AS b ON a.superparent=b.superparent
   WHERE a.id<>b.id
@@ -204,13 +202,12 @@ CREATE VIEW `v_tree_commonparent` AS
 DROP TABLE IF EXISTS `v_tree_commonrelationship`;
 DROP VIEW IF EXISTS `v_tree_commonrelationship`;
 CREATE VIEW `v_tree_commonrelationship` AS 
-  SELECT
-    aid, bid,
-    apath, bpath,
-    adepth, bdepth,
-    commonparentid, commondepth AS commondepth,
-    commondepth/adepth AS aratio,
-    commondepth/bdepth AS bratio
+  SELECT aid, bid,
+  apath, bpath,
+  adepth, bdepth,
+  commonparentid, commondepth AS commondepth,
+  commondepth/adepth AS aratio,
+  commondepth/bdepth AS bratio
   FROM v_tree_commonparent WHERE commonparentid IS NOT NULL
   ORDER BY apath, bpath;
 
@@ -242,7 +239,7 @@ BEGIN
       CALL sp_generate_test_data(maxrecords, depth - 1, lastparent);
     END IF;  
     SET counter = counter + 1;
-  END WHILE;
+    END WHILE;
     
 END$$
 DELIMITER ;
