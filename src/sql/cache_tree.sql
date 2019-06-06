@@ -216,6 +216,7 @@ CREATE VIEW `v_tree_commonrelationship` AS
 
 SET FOREIGN_KEY_CHECKS=1;
 
+/*
 -- insert test data
 DELIMITER $$
 DROP PROCEDURE IF EXISTS sp_generate_test_data$$
@@ -251,3 +252,4 @@ CALL sp_generate_test_data(5, 4, NULL);
 
 -- show data
 SELECT * FROM v_tree_calcpath LIMIT 100000;
+*/

@@ -237,6 +237,8 @@ CREATE VIEW `v_tree_cachepath` AS
 SET FOREIGN_KEY_CHECKS=1;
 
 -- insert test data
+
+/*
 DELIMITER $$
 DROP PROCEDURE IF EXISTS sp_generate_test_data$$
 CREATE PROCEDURE sp_generate_test_data(maxrecords INT, depth INT, parentid INT)
@@ -287,3 +289,4 @@ CALL sp_repair_tree_cache(6); -- fk updates don't fire triggers so deal with it 
 
 -- show cache
 SELECT * FROM v_tree_cachepath LIMIT 100000;
+*/
