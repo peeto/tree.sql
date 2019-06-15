@@ -79,23 +79,6 @@ BEGIN
 END ;;
 DELIMITER ;
 
--- get all descendant list into temp table for cursor
-DELIMITER $$
-DROP PROCEDURE IF EXISTS sp_get_all_children$$
-CREATE PROCEDURE sp_get_all_children(IN oldid INT)
-BEGIN
-  DROP TABLE IF EXISTS child_list;
-  CREATE TEMPORARY TABLE child_list (id INT, parentid INT);
-  
-  INSERT INTO child_list (SELECT id, parentid 
-    FROM (SELECT id, parentid FROM tree ORDER BY id, parentid) AS tree_sorted,
-      (SELECT @seekid := oldid) initialisation
-    WHERE find_in_set(parentid, @seekid)
-    AND length(@seekid := concat(@seekid, ',', id)));
-  
-END$$
-DELIMITER ;
-
 -- view calculates path and depth in realtime
 DROP TABLE IF EXISTS `v_tree_calcpath`;
 DROP VIEW IF EXISTS `v_tree_calcpath`;
@@ -107,116 +90,8 @@ CREATE VIEW `v_tree_calcpath` AS
     fn_get_tree_superparent(id) AS superparent
   FROM tree ORDER BY fn_get_tree_path(id);
 
--- function to attempt to find a common ancestor  
-DROP FUNCTION IF EXISTS `fn_get_tree_commonparent`;
-DELIMITER ;;
-CREATE FUNCTION `fn_get_tree_commonparent`(aid INT, bid INT) RETURNS INT
-BEGIN
-  DECLARE adepth INT;
-  DECLARE bdepth INT;
-  DECLARE afindid INT;
-  DECLARE bfindid INT;
-  DECLARE foundid INT;
-
-  SET afindid = aid;
-  SET bfindid = bid;
-  
-  SELECT depth INTO adepth FROM v_tree_calcpath WHERE id=aid;
-  SELECT depth INTO bdepth FROM v_tree_calcpath WHERE id=bid;
-  
-  WHILE adepth>bdepth DO
-    SELECT parentid, depth INTO afindid, adepth FROM v_tree_calcpath WHERE id=afindid;
-  END WHILE;
-  
-  WHILE bdepth>adepth DO
-    SELECT parentid, depth INTO bfindid, bdepth FROM v_tree_calcpath WHERE id=bfindid;
-  END WHILE;
-  
-  WHILE afindid!=bfindid AND afindid IS NOT NULL AND bfindid IS NOT NULL DO
-    SELECT parentid, depth INTO afindid, adepth FROM v_tree_calcpath WHERE id=afindid;
-    SELECT parentid, depth INTO bfindid, bdepth FROM v_tree_calcpath WHERE id=bfindid;
-  END WHILE;
-
-  IF afindid=bfindid THEN
-    RETURN afindid;
-  ELSE
-    RETURN NULL;
-  END IF;
-  
-END ;;
-DELIMITER ;
-
--- function to attempt to find the depth of a common ancestor
-DROP FUNCTION IF EXISTS `fn_get_tree_commondepth`;
-DELIMITER ;;
-CREATE FUNCTION `fn_get_tree_commondepth`(aid INT, bid INT) RETURNS INT
-BEGIN
-  DECLARE adepth INT;
-  DECLARE bdepth INT;
-  DECLARE afindid INT;
-  DECLARE bfindid INT;
-  DECLARE foundid INT;
-
-  SET afindid = aid;
-  SET bfindid = bid;
-  
-  SELECT depth INTO adepth FROM v_tree_calcpath WHERE id=aid;
-  SELECT depth INTO bdepth FROM v_tree_calcpath WHERE id=bid;
-  
-  WHILE adepth>bdepth DO
-    SELECT parentid, depth INTO afindid, adepth FROM v_tree_calcpath WHERE id=afindid;
-  END WHILE;
-  
-  WHILE bdepth>adepth DO
-    SELECT parentid, depth INTO bfindid, bdepth FROM v_tree_calcpath WHERE id=bfindid;
-  END WHILE;
-  
-  WHILE afindid!=bfindid AND afindid IS NOT NULL AND bfindid IS NOT NULL DO
-    SELECT parentid, depth INTO afindid, adepth FROM v_tree_calcpath WHERE id=afindid;
-    SELECT parentid, depth INTO bfindid, bdepth FROM v_tree_calcpath WHERE id=bfindid;
-  END WHILE;
-
-  IF afindid=bfindid THEN
-    RETURN adepth - 1;
-  ELSE
-    RETURN NULL;
-  END IF;
-  
-END ;;
-DELIMITER ;
-
--- this view includes the common ancestor and its depth between every two items in the tree
-DROP TABLE IF EXISTS `v_tree_commonparent`;
-DROP VIEW IF EXISTS `v_tree_commonparent`;
-CREATE VIEW `v_tree_commonparent` AS 
-  SELECT
-    a.id AS aid, b.id AS bid,
-    a.path AS apath, b.path AS bpath,
-    a.depth AS adepth, b.depth AS bdepth,
-    fn_get_tree_commonparent(a.id, b.id) AS commonparentid,
-    fn_get_tree_commondepth(a.id, b.id) AS commondepth
-  FROM v_tree_calcpath AS a
-  CROSS JOIN v_tree_calcpath AS b ON a.superparent=b.superparent
-  WHERE a.id<>b.id
-  ORDER BY a.path, b.path;
-
--- this view will calculate statistics based on v_tree_commonparent
-DROP TABLE IF EXISTS `v_tree_commonrelationship`;
-DROP VIEW IF EXISTS `v_tree_commonrelationship`;
-CREATE VIEW `v_tree_commonrelationship` AS 
-  SELECT
-    aid, bid,
-    apath, bpath,
-    adepth, bdepth,
-    commonparentid, commondepth AS commondepth,
-    commondepth/adepth AS aratio,
-    commondepth/bdepth AS bratio
-  FROM v_tree_commonparent WHERE commonparentid IS NOT NULL
-  ORDER BY apath, bpath;
-
 SET FOREIGN_KEY_CHECKS=1;
 
-/*
 -- insert test data
 DELIMITER $$
 DROP PROCEDURE IF EXISTS sp_generate_test_data$$
@@ -252,4 +127,3 @@ CALL sp_generate_test_data(5, 4, NULL);
 
 -- show data
 SELECT * FROM v_tree_calcpath LIMIT 100000;
-*/
